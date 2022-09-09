@@ -92,7 +92,7 @@ typedef struct FAT16_BOOT
     uint8_t totalBlock[BS_TOTAL_BLOCK];                         /* 32-35   Total number of blocks in the entire disk*/
     uint8_t physicalDriveNumber[BS_PHYSICAL_DRIVE_NUMBER];      /* 36-37   Physical drive number*/
     uint8_t extendedBootSignature[BS_EXTENDED_BOOT_SIGNATURE];  /* 38      Extended Boot Record Signature*/
-    uint8_t volumeSerialNumber[BS_VOLUME_SERIAL_NUMBER];        /* 39-42   	Volume Serial Number*/
+    uint8_t volumeSerialNumber[BS_VOLUME_SERIAL_NUMBER];        /* 39-42   Volume Serial Number*/
     uint8_t volumeLabel[BS_VOLUME_LABEL];                       /* 43-53   Volume Label*/
     uint8_t fileSystemType[BS_NAME_OF_FAT];                     /* 54-61   file system type level */
     uint8_t bootstrap1[BS_BOOT_STRAP];                          /* 62-509  bootstrap code*/
@@ -127,11 +127,11 @@ typedef struct FAT32_BOOT
 #define ATT_DIRECTORY                               0x10
 #define ATT_ARCHIVE_FLAG                            0x20
 
-
+#define RD_BYTES_OF_A_ENTRY							32			/*New update*/
 /* FAT 12 ROOT */
 typedef struct FAT12_ROOT
 {
-    uint8_t fileName[RD_FILE_NAME];                                        /* 0-7   file name */
+    uint8_t fileName[RD_FILE_NAME];                                      /* 0-7   file name */
     uint8_t fileNameExtension[RD_FILENAME_EXTENSION];                   /* 8-10  file name extension */
     uint8_t fileAttributes[RD_FILE_ATTRIBUTES];                         /* 11    file attributes */
     uint8_t reserved[RD_RESERVED];                                      /* 12-21 reserved */
@@ -162,7 +162,7 @@ FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot);
 
 uint32_t reverseByte(uint8_t *byte, uint32_t count);
 
-
+FAT12RootTypes *ReadFile(const char *filePath, FAT12BootTypes *boot);
 
 #endif /*_READFAT_H_*/
 

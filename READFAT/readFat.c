@@ -23,8 +23,13 @@ FatTypes checkFatTypes(const char *filePath)
         {
             fatName[i] = fgetc(f);
         }
-
-        // printf("[INFO] FAT name %s\n", fatName);
+        printf("[INFO] FAT name: ");
+	    for (int i = 0; i < BS_NAME_OF_FAT; i++)
+	    {
+	        printf("%c", fatName[i]);
+	    }
+	    printf("\n");
+        
 
         if (strncmp(fatName, "FAT12", 5) == 0)
         {
@@ -63,6 +68,7 @@ FatTypes checkFatTypes(const char *filePath)
 
     return retVal;
 }
+
 
 /* read boot sector for FAT 12 */
 FAT12BootTypes *readBootSector12(const char *filePath)
@@ -119,67 +125,109 @@ FAT32BootTypes *readBootSector32(const char *filePath)
 } /*READ_BOOT_SECTOR_32*/
 
 
+
+/* Define Global Values*/
+uint32_t fatCopy;
+uint32_t sectorPerFAT;
+uint32_t bytePerSector;
+uint32_t numberOfRootDirEntry;
+uint32_t rdetEntry;
+uint32_t firstRootLocation;
+
+uint32_t AdressOfClusterDataFile[225] = {0};
+uint32_t FileTime[225] = {0};
+uint32_t FileDate[225] = {0};
+uint32_t SizeOfFileInRoot[225] = {0};
+
 FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot)
 {
     FAT12RootTypes *rootSector = (FAT12RootTypes *)malloc(sizeof(FAT12RootTypes));
 
     FILE *f = fopen(filePath, "rb");
+
     if (f == NULL)
     {
         printf("[ERROR] Cannot open file\n");
     }
     else
     {
+
         /* calculate the first byte of root directory location */
-        uint32_t fatCopy = reverseByte(boot->fatCopy, BS_FAT_COPY);
-        uint32_t sectorPerFAT = reverseByte(boot->sectorPerFAT, BS_SECTOR_PER_FAT);
-        uint32_t bytePerSector = reverseByte(boot->bytePerSector, BS_BYTE_PER_SECTOR);
+        fatCopy = reverseByte(boot->fatCopy, BS_FAT_COPY);
+        sectorPerFAT = reverseByte(boot->sectorPerFAT, BS_SECTOR_PER_FAT);
+        bytePerSector = reverseByte(boot->bytePerSector, BS_BYTE_PER_SECTOR);
+		
+        firstRootLocation = (1 + (fatCopy) * (sectorPerFAT) ) * bytePerSector;
+ 
+        numberOfRootDirEntry = reverseByte(boot->rdetEntry, BS_ROOT_DIR_ENTRY);
+        
+        printf("FILE *f init %x\n", f);
+        // fseek(f, firstRootLocation, 1);
+        fseek(f, 0x2600, 1);
+        printf("FILE *f after fseek %x\n", f);
 
-        uint32_t firstRootLocation = (1 + (fatCopy) * (sectorPerFAT) ) * bytePerSector;
+        // for (int k = 0; k < 0x2600; k++)
+        // {
+        //     fgetc(f);
+        // }
 
-        // printf("\nfirstRootLocation: %x\n", firstRootLocation);
 
-        /* calculate the last of root directory location */
-        uint32_t rdetEntry = reverseByte(boot->rdetEntry, BS_ROOT_DIR_ENTRY);
+        int count  = 0;
 
-        // uint32_t lastRootLocation = firstRootLocation + rdetEntry * 32;
+        for (int i = 0; i < 20; i++)//numberOfRootDirEntry
+        {           
 
-        // printf("\nlastRootLocation: %x\n", lastRootLocation); 
-
-        // rewind(f);
-
-        fseek(f, firstRootLocation, 1);
-
-        for (int i = 0; i < rdetEntry; i++)
-        {
+            printf("FILE *f = %x\n", f);
             fread(rootSector, sizeof(FAT12RootTypes), 1, f);
+
 
             if ((ATT_LONG_FILE_NAME != (rootSector->fileAttributes[0])) && 0x00 != (rootSector->fileName[0]))
             {
+
+            	/* get name of file and root directory */
                 printf("[INFO] Root name: ");
-                for (int j = 0; j < 8; j++)
+                for (int j = 0; j < RD_FILE_NAME; j++)
                 {
                     printf("%c", rootSector->fileName[j]);
                 }
                 printf("\n");
-                // fseek(f, 0x32, SEEK_CUR);                
-                // fread(rootSector, sizeof(FAT12RootTypes), 1, f);
-            }
+                
+                /* find adress of file or directory from Data Sectors*/
+                AdressOfClusterDataFile[count] = reverseByte(rootSector->startingClusterNumber, RD_STARTING_CLUSTER_NUMBER);
+
+                /* find filetime*/
+                FileTime[count] = reverseByte(rootSector->fileTime, RD_FILE_TIME);
+
+                /* find filedate*/
+                FileDate[count] = reverseByte(rootSector->fileDate, RD_FILE_DATE);
+
+                /* find siez of file in root*/
+                SizeOfFileInRoot[count] = reverseByte(rootSector->fileSize, RD_FILE_SIZE);
+            
+        	    printf("[INFO] Adress of data: %x \t", AdressOfClusterDataFile[count]);
+        		printf("[INFO] File time: %d \t", FileTime[count]);
+        		printf("[INFO] File date: %d \t", FileDate[count]);
+        		printf("[INFO] Size of file: %d \n", SizeOfFileInRoot[count]);
+                // printf("%d ", FileTime);
+                count++;
+
+            }	
+
         }
+        printf("\n\n\n");
+        // printf("%d", FileTime);
+        for (int i = 0 ; i < count ; i++)
+        {
+                printf("[INFO] Adress of data: %x \t", AdressOfClusterDataFile[i]);
+                printf("[INFO] File time: %d \t", FileTime[i]);
+                printf("[INFO] File date: %d \t", FileDate[i]);
+                printf("[INFO] Size of file: %d \n", SizeOfFileInRoot[i]);
+        }
+
         fclose(f);
     }
     return rootSector;
 }
-
-/* */
-// Bool isFile(uint8_t attByte)
-// {
-//     Bool retValue = TRUE;
-//     if (0x10 == attByte)
-//     {
-
-//     }
-// }
 
 
 /* reverse byte */
@@ -192,11 +240,54 @@ uint32_t reverseByte(uint8_t *byte, uint32_t count)
     }
     return result;
 } 
-// void ReadSubDirectory()
-// {
 
-// }
-// void ReadFile()
-// {
+FAT12RootTypes *ReadFile(const char *filePath, FAT12BootTypes *boot)
+{	
 
-// }
+	uint32_t firstDataLocation;
+	uint32_t AdressOfClusterDataFile;
+	uint32_t startingOfByteDataFile;
+	uint32_t SizeOfFileInRoot;
+	
+	FAT12RootTypes *rootSector = (FAT12RootTypes *)malloc(sizeof(FAT12RootTypes));
+	
+	
+    FILE *f = fopen(filePath, "rb");
+    
+    fread(rootSector, sizeof(FAT12RootTypes), 1, f);
+    if (f == NULL)
+    {
+        printf("[ERROR] Cannot open file\n");
+    }
+    else
+	{	
+	    firstDataLocation = (1 + (fatCopy) * (sectorPerFAT) ) * bytePerSector + numberOfRootDirEntry * RD_BYTES_OF_A_ENTRY - (2 * BS_BYTE_PER_SECTOR);
+	     
+    	AdressOfClusterDataFile = reverseByte(rootSector->startingClusterNumber, RD_STARTING_CLUSTER_NUMBER);
+    	SizeOfFileInRoot = reverseByte(rootSector->fileSize, RD_FILE_SIZE);
+   		startingOfByteDataFile = firstDataLocation + AdressOfClusterDataFile * BS_BYTE_PER_SECTOR;
+   		printf("\nAdressOfClusterDataFile: %x\n", AdressOfClusterDataFile);
+   		printf("\nstartingOfByteDataFile: %x\n", startingOfByteDataFile);
+   		
+   		printf("size of file: %d\n", SizeOfFileInRoot);
+   		fclose(f);
+   		printf("%x\n", AdressOfClusterDataFile);
+   		FILE *f = fopen(filePath, "rb");
+   		fseek(f, 0x4200, 1);
+   		
+   		char dataFile1[SizeOfFileInRoot];
+   		for (int i = 0; i < SizeOfFileInRoot; i++)
+   		{
+   			dataFile1[i] = fgetc(f);	
+		}
+		for (int i = 0; i < SizeOfFileInRoot; i++)
+		{
+			printf("%c", dataFile1[i]);
+		}
+		fclose(f);
+	}
+	
+
+	
+}
+
