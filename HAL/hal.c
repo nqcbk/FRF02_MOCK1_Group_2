@@ -3,8 +3,7 @@
 
 
 /* This function is to add a node in sub directory */
-static void addNode(Generation **headGen, uint8_t *data, uint32_t fatherIndex)
-{
+static void addNode(Generation **headGen, uint8_t *data, uint32_t fatherIndex){
     Node *newNode = (Node *)malloc(sizeof(Node));
     if (newNode != NULL)
     {
@@ -37,21 +36,17 @@ static void addNode(Generation **headGen, uint8_t *data, uint32_t fatherIndex)
 
 
 /* This function is to add a generation */
-static void addGeneration(Generation **head)
-{
+static void addGeneration(Generation **head) {
     Generation *newGeneration = (Generation *)malloc(sizeof(Generation));
-    if (newGeneration != NULL)
-    {
+    if (newGeneration != NULL) {
         newGeneration->ptrGen = NULL;
         newGeneration->next = NULL;
 		newGeneration->level = 0;
-        if (NULL == (*head))
-        {
+        if (NULL == (*head)) {
             *head = newGeneration;
 			newGeneration->level = 1;
         }
-        else
-        {
+        else {
             Generation *temp = (*head);
             while(temp->next != NULL)
             {
@@ -128,6 +123,7 @@ void getData(Generation *gen, char data[][12], uint32_t fatherIndex) {
 		addNode(&lastGen, data[i], fatherIndex);
 	}
 }
+
 // Ham in toan bo thu muc va file cua generation cuoi cung, tra ve so luong phan tu
 uint32_t printList(Generation *gen){
 	uint32_t count = 0;
@@ -141,7 +137,7 @@ uint32_t printList(Generation *gen){
 		Node *temp = lastGen->ptrGen;
 		while (temp != NULL) {
 			printf("%d. %s\n", temp->selfIndex + 1, temp->data);
-			count = temp->selfIndex;
+			count = temp->selfIndex + 1;
 			temp = temp->next;
 		}
 	}
@@ -203,6 +199,7 @@ uint32_t inputNumberByUser(uint32_t maxNumber) {
 	uint32_t number = 0;
 	do{
 		printf("\nInput a number to open: ");
+		fflush(stdin);
 		scanf("%d", &number);
 	}while((number < 0) || (number > maxNumber));
 	return number;

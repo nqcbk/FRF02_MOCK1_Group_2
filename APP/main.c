@@ -11,10 +11,10 @@ void main(int argc, char* argv[]){
 	numberOfElements = openDirectory(&gen, 0);
 	do {
 		if (getLevel(gen) > 1) {
-			printf("0. Back\n");
+			printf("\n0. Back\n");
 		}
 		else {
-			printf("0. Exit\n");
+			printf("\n0. Exit\n");
 		}
 		// Nguoi dung nhap vao mot so trong doan 0 - a
 		input = inputNumberByUser(numberOfElements);

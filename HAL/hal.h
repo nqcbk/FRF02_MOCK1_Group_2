@@ -40,9 +40,9 @@ uint32_t closeDirectory(Generation **gen);
 // uint32_t openDirectory(Generation *gen, uint32_t fatherIndex) ;
 uint32_t openDirectory(Generation **gen, uint32_t fatherIndex);
 
-static void addGeneration(Generation **head)
+static void addGeneration(Generation **head);
 
-static void deleteGeneration(Generation **head)
+static void deleteGeneration(Generation **head);
 
 void addNodeRoot(Generation **headGen, Node **headRoot, uint8_t *data);
 
