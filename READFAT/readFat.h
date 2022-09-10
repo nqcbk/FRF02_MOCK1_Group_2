@@ -141,6 +141,26 @@ typedef struct FAT12_ROOT
     uint8_t fileSize[RD_FILE_SIZE];                                      /* 28-31 File size (0 for directories) */
 } FAT12RootTypes;
 
+#define DT_NAME_OF_DATA_FILE                       8
+#define DT_TYPE_OF_DATA_FILE                       3
+#define DT_FILEDATA_ATTRIBUTES                     1
+#define DT_RESERVED                                10
+#define DT_FILE_TIME                               2
+#define DT_FILE_DATE                               2
+#define DT_STARTING_CLUSTER_NUMBER                 2
+#define DT_DATA_FILE_SIZE                          4
+
+typedef struct FAT12_DATA
+{
+    uint8_t NameOfDataFile[DT_NAME_OF_DATA_FILE];                           /* 0-7   file name */
+    uint8_t TypeOfDataFile[DT_TYPE_OF_DATA_FILE];                           /* 8-10  file name extension */
+    uint8_t DataFileAttributes[DT_FILEDATA_ATTRIBUTES];                     /* 11    file attributes */
+    uint8_t ReservedDataFile[DT_RESERVED];                                  /* 12-21 reserved */
+    uint8_t DataFileTime[DT_FILE_TIME];                                     /* 22-23 file time */
+    uint8_t DataFileDate[DT_FILE_DATE];                                     /* 24-25 file date */
+    uint8_t DataFileStartingClusterNumber[DT_STARTING_CLUSTER_NUMBER];      /* 26-27 starting cluster number */
+    uint8_t sizeOfDataFile[DT_DATA_FILE_SIZE];                              /* 28-31 File size (0 for directories) */
+} FAT12DataFileTypes;
 
 /* check FAT type */
 FatTypes checkFatTypes(const char *filePath);
@@ -163,6 +183,8 @@ FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot);
 uint32_t reverseByte(uint8_t *byte, uint32_t count);
 
 FAT12RootTypes *ReadFile(const char *filePath, FAT12BootTypes *boot);
+
+FAT12RootTypes *ReadSubDirectory(const char *filePath, FAT12BootTypes *boot);
 
 #endif /*_READFAT_H_*/
 

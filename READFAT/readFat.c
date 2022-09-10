@@ -134,11 +134,12 @@ uint32_t numberOfRootDirEntry;
 uint32_t rdetEntry;
 uint32_t firstRootLocation;
 
-uint32_t AdressOfClusterDataFile[225] = {0};
-uint32_t FileTime[225] = {0};
-uint32_t FileDate[225] = {0};
-uint32_t SizeOfFileInRoot[225] = {0};
+uint32_t AdressOfClusterDataFile[224] = {0};
+uint32_t FileTime[224] = {0};
+uint32_t FileDate[224] = {0};
+uint32_t SizeOfFileInRoot[224] = {0};
 
+uint32_t count  = 0;
 FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot)
 {
     FAT12RootTypes *rootSector = (FAT12RootTypes *)malloc(sizeof(FAT12RootTypes));
@@ -161,23 +162,11 @@ FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot)
  
         numberOfRootDirEntry = reverseByte(boot->rdetEntry, BS_ROOT_DIR_ENTRY);
         
-        printf("FILE *f init %x\n", f);
-        // fseek(f, firstRootLocation, 1);
-        fseek(f, 0x2600, 1);
-        printf("FILE *f after fseek %x\n", f);
+        fseek(f, firstRootLocation, 1);
 
-        // for (int k = 0; k < 0x2600; k++)
-        // {
-        //     fgetc(f);
-        // }
-
-
-        int count  = 0;
-
-        for (int i = 0; i < 20; i++)//numberOfRootDirEntry
+        for (int i = 0; i < numberOfRootDirEntry; i++)
         {           
 
-            printf("FILE *f = %x\n", f);
             fread(rootSector, sizeof(FAT12RootTypes), 1, f);
 
 
@@ -190,8 +179,10 @@ FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot)
                 {
                     printf("%c", rootSector->fileName[j]);
                 }
-                printf("\n");
+                printf(" \n");
                 
+                /* Find File Name Extension*/
+
                 /* find adress of file or directory from Data Sectors*/
                 AdressOfClusterDataFile[count] = reverseByte(rootSector->startingClusterNumber, RD_STARTING_CLUSTER_NUMBER);
 
@@ -203,25 +194,9 @@ FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot)
 
                 /* find siez of file in root*/
                 SizeOfFileInRoot[count] = reverseByte(rootSector->fileSize, RD_FILE_SIZE);
-            
-        	    printf("[INFO] Adress of data: %x \t", AdressOfClusterDataFile[count]);
-        		printf("[INFO] File time: %d \t", FileTime[count]);
-        		printf("[INFO] File date: %d \t", FileDate[count]);
-        		printf("[INFO] Size of file: %d \n", SizeOfFileInRoot[count]);
-                // printf("%d ", FileTime);
+
                 count++;
-
             }	
-
-        }
-        printf("\n\n\n");
-        // printf("%d", FileTime);
-        for (int i = 0 ; i < count ; i++)
-        {
-                printf("[INFO] Adress of data: %x \t", AdressOfClusterDataFile[i]);
-                printf("[INFO] File time: %d \t", FileTime[i]);
-                printf("[INFO] File date: %d \t", FileDate[i]);
-                printf("[INFO] Size of file: %d \n", SizeOfFileInRoot[i]);
         }
 
         fclose(f);
@@ -241,53 +216,83 @@ uint32_t reverseByte(uint8_t *byte, uint32_t count)
     return result;
 } 
 
+uint32_t firstDataLocation;
+uint32_t startingOfByteDataFile;
+
 FAT12RootTypes *ReadFile(const char *filePath, FAT12BootTypes *boot)
 {	
 
-	uint32_t firstDataLocation;
-	uint32_t AdressOfClusterDataFile;
-	uint32_t startingOfByteDataFile;
-	uint32_t SizeOfFileInRoot;
-	
-	FAT12RootTypes *rootSector = (FAT12RootTypes *)malloc(sizeof(FAT12RootTypes));
-	
-	
     FILE *f = fopen(filePath, "rb");
-    
-    fread(rootSector, sizeof(FAT12RootTypes), 1, f);
     if (f == NULL)
     {
         printf("[ERROR] Cannot open file\n");
     }
     else
 	{	
-	    firstDataLocation = (1 + (fatCopy) * (sectorPerFAT) ) * bytePerSector + numberOfRootDirEntry * RD_BYTES_OF_A_ENTRY - (2 * BS_BYTE_PER_SECTOR);
-	     
-    	AdressOfClusterDataFile = reverseByte(rootSector->startingClusterNumber, RD_STARTING_CLUSTER_NUMBER);
-    	SizeOfFileInRoot = reverseByte(rootSector->fileSize, RD_FILE_SIZE);
-   		startingOfByteDataFile = firstDataLocation + AdressOfClusterDataFile * BS_BYTE_PER_SECTOR;
-   		printf("\nAdressOfClusterDataFile: %x\n", AdressOfClusterDataFile);
-   		printf("\nstartingOfByteDataFile: %x\n", startingOfByteDataFile);
-   		
-   		printf("size of file: %d\n", SizeOfFileInRoot);
+        printf("count: %d ", count);
+        for(int i = 0; i < count; i++)
+        {
+            printf("adress: %d\n", AdressOfClusterDataFile[i]);
+        }
+	    firstDataLocation = (1 + (fatCopy) * (sectorPerFAT) ) * bytePerSector + numberOfRootDirEntry * RD_BYTES_OF_A_ENTRY - (2 * bytePerSector);
+
+	    startingOfByteDataFile = firstDataLocation + AdressOfClusterDataFile[1] * bytePerSector;
+
    		fclose(f);
-   		printf("%x\n", AdressOfClusterDataFile);
+
    		FILE *f = fopen(filePath, "rb");
-   		fseek(f, 0x4200, 1);
+   		fseek(f, startingOfByteDataFile, 1);
    		
-   		char dataFile1[SizeOfFileInRoot];
-   		for (int i = 0; i < SizeOfFileInRoot; i++)
+   		char dataFile1[SizeOfFileInRoot[1]];
+   		for (int i = 0; i < SizeOfFileInRoot[1]; i++)
    		{
    			dataFile1[i] = fgetc(f);	
 		}
-		for (int i = 0; i < SizeOfFileInRoot; i++)
+		for (int i = 0; i < SizeOfFileInRoot[1]; i++)
 		{
 			printf("%c", dataFile1[i]);
 		}
+        printf("\n");
 		fclose(f);
-	}
-	
-
-	
+	}	
 }
 
+uint32_t startingOfSubDirLocation;
+
+FAT12RootTypes *ReadSubDirectory(const char *filePath, FAT12BootTypes *boot)
+{
+
+    FAT12RootTypes *subDirSector = (FAT12RootTypes *)malloc(sizeof(FAT12RootTypes));
+
+    FILE *f = fopen(filePath, "rb");
+
+    
+    if (f == NULL)
+    {
+        printf("[ERROR] Cannot open file\n");
+    }
+    else
+    {
+        
+        startingOfSubDirLocation = firstDataLocation + AdressOfClusterDataFile[5] * bytePerSector;
+        printf("startingOfSubDirLocation : %x \n", startingOfSubDirLocation);
+        fseek(f, startingOfSubDirLocation, 1);
+
+        for (int i = 0; i < 5; i++)
+        {           
+            fread(subDirSector, sizeof(FAT12RootTypes), 1, f);  
+
+            if ((0x00 != (subDirSector->fileName[0])) && (ATT_LONG_FILE_NAME != (subDirSector->fileAttributes[0])) && (0x2e != (subDirSector->fileName[0])))
+            {
+                printf("[INFO] Sub name: ");
+                for (int j = 0; j < RD_FILE_NAME; j++)
+                {
+                    printf("%c", subDirSector->fileName[j]);
+                }
+                printf("\n");
+            }
+
+        }
+        fclose(f);
+    }
+}
