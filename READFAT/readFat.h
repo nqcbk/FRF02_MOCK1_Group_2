@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define NUMBER_OF_BOOT_SECTORS						1
+
+
+
 #define BS_BOOT_STRAP_JUMP                          3 
 #define BS_OEM                                      8
 #define BS_BYTE_PER_SECTOR                          2
@@ -66,7 +70,7 @@ typedef struct FAT12_BOOT
     uint8_t extendedBootSignature[BS_EXTENDED_BOOT_SIGNATURE];  /* 38      Extended Boot Record Signature*/
     uint8_t volumeSerialNumber[BS_VOLUME_SERIAL_NUMBER];        /* 39-42   	Volume Serial Number*/
     uint8_t volumeLabel[BS_VOLUME_LABEL];                       /* 43-53   Volume Label*/
-    uint8_t fileSystemType[BS_NAME_OF_FAT];                          /* 54-61   name of FAT type*/
+    uint8_t fileSystemType[BS_NAME_OF_FAT];                     /* 54-61   name of FAT type*/
     uint8_t bootstrap1[BS_BOOT_STRAP];                          /* 62-509  bootstrap code*/
     uint8_t signature[BS_SIGNATURE];                            /* 510-511 signature 0x55 0xaa*/
 
@@ -126,41 +130,34 @@ typedef struct FAT32_BOOT
 #define ATT_LONG_FILE_NAME                          0x0F
 #define ATT_DIRECTORY                               0x10
 #define ATT_ARCHIVE_FLAG                            0x20
+#define ATT_END_OF_FILE								0xFFFF
 
 #define RD_BYTES_OF_A_ENTRY							32			/*New update*/
 /* FAT 12 ROOT */
 typedef struct FAT12_ROOT
 {
     uint8_t fileName[RD_FILE_NAME];                                      /* 0-7   file name */
-    uint8_t fileNameExtension[RD_FILENAME_EXTENSION];                   /* 8-10  file name extension */
-    uint8_t fileAttributes[RD_FILE_ATTRIBUTES];                         /* 11    file attributes */
-    uint8_t reserved[RD_RESERVED];                                      /* 12-21 reserved */
-    uint8_t fileTime[RD_FILE_TIME];                                     /* 22-23 file time */
-    uint8_t fileDate[RD_FILE_DATE];                                     /* 24-25 file date */
+    uint8_t fileNameExtension[RD_FILENAME_EXTENSION];                    /* 8-10  file name extension */
+    uint8_t fileAttributes[RD_FILE_ATTRIBUTES];                          /* 11    file attributes */
+    uint8_t reserved[RD_RESERVED];                                       /* 12-21 reserved */
+    uint8_t fileTime[RD_FILE_TIME];                                      /* 22-23 file time */
+    uint8_t fileDate[RD_FILE_DATE];                                      /* 24-25 file date */
     uint8_t startingClusterNumber[RD_STARTING_CLUSTER_NUMBER];           /* 26-27 starting cluster number */
     uint8_t fileSize[RD_FILE_SIZE];                                      /* 28-31 File size (0 for directories) */
 } FAT12RootTypes;
 
-#define DT_NAME_OF_DATA_FILE                       8
-#define DT_TYPE_OF_DATA_FILE                       3
-#define DT_FILEDATA_ATTRIBUTES                     1
-#define DT_RESERVED                                10
-#define DT_FILE_TIME                               2
-#define DT_FILE_DATE                               2
-#define DT_STARTING_CLUSTER_NUMBER                 2
-#define DT_DATA_FILE_SIZE                          4
-
-typedef struct FAT12_DATA
+#define FILENAME_NEVER_USED							0x00
+#define FILENAME_DELETED_1							0xE5
+#define FILENAME_DELETED_2							0x05
+#define FILENAME_SPECIAL_ENTRY						0x2E
+		
+typedef struct DATA_HAL
 {
-    uint8_t NameOfDataFile[DT_NAME_OF_DATA_FILE];                           /* 0-7   file name */
-    uint8_t TypeOfDataFile[DT_TYPE_OF_DATA_FILE];                           /* 8-10  file name extension */
-    uint8_t DataFileAttributes[DT_FILEDATA_ATTRIBUTES];                     /* 11    file attributes */
-    uint8_t ReservedDataFile[DT_RESERVED];                                  /* 12-21 reserved */
-    uint8_t DataFileTime[DT_FILE_TIME];                                     /* 22-23 file time */
-    uint8_t DataFileDate[DT_FILE_DATE];                                     /* 24-25 file date */
-    uint8_t DataFileStartingClusterNumber[DT_STARTING_CLUSTER_NUMBER];      /* 26-27 starting cluster number */
-    uint8_t sizeOfDataFile[DT_DATA_FILE_SIZE];                              /* 28-31 File size (0 for directories) */
-} FAT12DataFileTypes;
+    uint8_t fileAttributes;
+    uint32_t startingClusterNumber; 
+    uint8_t fileSize;
+} DataHalTypes;
+
 
 /* check FAT type */
 FatTypes checkFatTypes(const char *filePath);
@@ -168,23 +165,28 @@ FatTypes checkFatTypes(const char *filePath);
 /* read boot sector for FAT 12 */
 FAT12BootTypes *readBootSector12(const char *filePath);
 
-/* read boot sector for FAT 16*/
-FAT16BootTypes *readBootSector16(const char *filePath);
+// /* read boot sector for FAT 16*/
+// FAT16BootTypes *readBootSector16(const char *filePath);
 
-/* read boot sector for FAT 32 */
-FAT32BootTypes *readBootSector32(const char *filePath);
+// /* read boot sector for FAT 32 */
+// FAT32BootTypes *readBootSector32(const char *filePath);
 
 /* read root directory fat 12*/
-FAT12RootTypes *readRootDirectory12(const char *filePath, FAT12BootTypes *boot);
+uint32_t readRootDirectory12(const char *filePath);
 
-// Bool isDir();
+uint32_t readSubDirectory(const char *filePath, DataHalTypes *data);
 
+DataHalTypes getRootData(const char *filePath, uint32_t index);
+
+DataHalTypes getSubData(const char *filePath, DataHalTypes *data, uint32_t index); 
+
+uint32_t readFile(const char *filePath, DataHalTypes *data);
+
+Bool isFolder(DataHalTypes data);
+
+static Bool checkFileName(FAT12RootTypes *root);
 
 uint32_t reverseByte(uint8_t *byte, uint32_t count);
-
-FAT12RootTypes *ReadFile(const char *filePath, FAT12BootTypes *boot);
-
-FAT12RootTypes *ReadSubDirectory(const char *filePath, FAT12BootTypes *boot);
 
 #endif /*_READFAT_H_*/
 

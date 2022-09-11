@@ -11,9 +11,7 @@
 *******************************************************************************/
 
 typedef struct Node{
-    uint8_t *data;
-    uint32_t selfIndex;
-    uint32_t fatherIndex;
+    DataHalTypes data;
     struct Node *next;
 } Node;
 
@@ -27,26 +25,23 @@ typedef struct Generation{
 * FUNCTION PROTOTYPE
 ******************************************************************************/
 
-uint32_t getLevel(Generation *head);
-
 uint32_t inputNumberByUser(uint32_t maxNumber);
 
-void getData(Generation *gen, char data[][12], uint32_t fatherIndex);
+void printNode(Node *head);
 
-uint32_t printList(Generation *gen);
+uint32_t openRoot(Node **head, const char *filePath);
 
-uint32_t closeDirectory(Generation **gen);
+uint32_t openDirectory(Node **head, const char *filePath, uint8_t index);
 
-// uint32_t openDirectory(Generation *gen, uint32_t fatherIndex) ;
-uint32_t openDirectory(Generation **gen, uint32_t fatherIndex);
+uint32_t closeDirectory(Node **head, const char *filePath);
 
-static void addGeneration(Generation **head);
+static void deleteNode(Node **head);
 
-static void deleteGeneration(Generation **head);
+uint32_t numberOfNode(Node *head);
 
-void addNodeRoot(Generation **headGen, Node **headRoot, uint8_t *data);
+static void addNode(Node **head, DataHalTypes data);
 
-static void addNode(Generation **headGen, uint8_t *data, uint32_t fatherIndex);
+DataHalTypes getDataFromLastNode(Node *head);
 
 
 /*******************************************************************************

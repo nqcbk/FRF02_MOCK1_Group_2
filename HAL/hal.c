@@ -3,88 +3,54 @@
 
 
 /* This function is to add a node in sub directory */
-static void addNode(Generation **headGen, uint8_t *data, uint32_t fatherIndex){
+static void addNode(Node **head, DataHalTypes data){
     Node *newNode = (Node *)malloc(sizeof(Node));
-    if (newNode != NULL)
-    {
-        newNode->data = data;
-		newNode->next = NULL;
-		if ((*headGen)->next == NULL) {
-			newNode->fatherIndex = 0;
+	
+	// Assign Data for Node
+	newNode->data = data;
+	newNode->next = NULL;
+	if ((*head) == NULL) {
+		(*head) = newNode;
+	}
+    else{
+		// Find the node at end of linked list
+		Node *temp = *head;
+		while( temp->next != NULL )
+		{
+			temp = temp->next;
 		}
-		else {
-			newNode->fatherIndex = fatherIndex;
-		}
-        if (NULL == ((*headGen)->ptrGen))
-        {
-			(*headGen)->ptrGen = newNode;
-			newNode->selfIndex = 0;
-        }
-        else
-        {
-            Node *temp = (*headGen)->ptrGen;
-            while( temp->next != NULL )
-            {
-                temp = temp->next;
-            }
-			newNode->next = NULL;  
-            temp->next = newNode;
-			newNode->selfIndex = temp->selfIndex + 1;
-        }
+		newNode->next = NULL;  
+		temp->next = newNode;
     }   
 }
 
 
-/* This function is to add a generation */
-static void addGeneration(Generation **head) {
-    Generation *newGeneration = (Generation *)malloc(sizeof(Generation));
-    if (newGeneration != NULL) {
-        newGeneration->ptrGen = NULL;
-        newGeneration->next = NULL;
-		newGeneration->level = 0;
-        if (NULL == (*head)) {
-            *head = newGeneration;
-			newGeneration->level = 1;
-        }
-        else {
-            Generation *temp = (*head);
-            while(temp->next != NULL)
-            {
-                temp = temp->next;
-            }
-            temp->next = newGeneration;
-            newGeneration->next = NULL;
-			newGeneration->level = temp->level + 1;
-        }
-    }
-}
-
-// Lay so phan tu cua gen
-uint32_t getLevel(Generation *head) {
+// Lay so phan tu cua list
+uint32_t numberOfNode(Node *head) {
 	uint32_t result = 0;
 	if (head != NULL) {
-		// Tim den gen cuoi cung
-		Generation *lastGen = head;
-		while (lastGen->next != NULL) {
-			lastGen = lastGen->next;
+		// Tim den phan tu cuoi cung
+		Node *lastNode = head;
+		while (lastNode != NULL) {
+			result++;
+			lastNode = lastNode->next;
 		}
-		result = lastGen->level;
 	}
 	return result;
 }
 
-/* This function is to delete the last Generation */
-static void deleteGeneration(Generation **head){
+/* This function is to xoa phan tu cuoi cung */
+static void deleteNode(Node **head){
 	if((*head) != NULL) {
-		// Neu chi co 1 gen thi xoa gen do
+		// Neu chi co 1 node thi xoa node do
 		if ((*head)->next == NULL)
         {
             *head = NULL;
         }
-		// Neu co nhieu gen thi xoa gen cuoi cung
+		// Neu co nhieu node thi xoa node cuoi cung
         else
         {
-            Generation *temp = (*head);
+            Node *temp = (*head);
             while((temp->next)->next != NULL )
             {
 				temp = temp->next;
@@ -97,99 +63,109 @@ static void deleteGeneration(Generation **head){
 /* This function is to open a file	*/
 
 
-/* This function is to close directory	*/
-uint32_t closeDirectory(Generation **gen) {
-	uint32_t numberOfElements = 0;
-	if((*gen) != NULL) {
-		deleteGeneration(gen);
-		// Print data
-		numberOfElements = printList(*gen);
-	}
-	// Tra ve so phan tu cua thu muc
-	return numberOfElements;
-}
-
-
-char data[][12] = {"app", "doc", "pic", "sample.txt", "sample1.txt", "sample2.txt", "sample3.txt"};
-void getData(Generation *gen, char data[][12], uint32_t fatherIndex) {
-	// Tim den phan tu cuoi cung cua gen
-	Generation *lastGen = gen;
-	while (lastGen->next != NULL) {
-		lastGen = lastGen->next;
-	}
-	// Add data cho generation cuoi cung
-	uint32_t i = 0;
-	for (i = 0; i < 7; i++) {
-		addNode(&lastGen, data[i], fatherIndex);
-	}
-}
 
 // Ham in toan bo thu muc va file cua generation cuoi cung, tra ve so luong phan tu
-uint32_t printList(Generation *gen){
-	uint32_t count = 0;
-	if(gen != NULL) {
-		// Tim den gen cuoi cung
-		Generation *lastGen = gen;
-		while (lastGen->next != NULL) {
-			lastGen = lastGen->next;
-		}
-		// In toan bo data cua cac node trong gen cuoi cung
-		Node *temp = lastGen->ptrGen;
-		while (temp != NULL) {
-			printf("%d. %s\n", temp->selfIndex + 1, temp->data);
-			count = temp->selfIndex + 1;
+void printNode(Node *head){
+	if(head != NULL) {
+		// Tim den node cuoi cung
+		Node *temp = head;
+		while (temp->next != NULL) {
 			temp = temp->next;
 		}
+		printf("fileAttributes: %x\n", temp->data.fileAttributes);
+		printf("startingClusterNumber: %x\n", temp->data.startingClusterNumber);
+		printf("fileSize: %x\n", temp->data.fileSize);
+		printf("\n");
 	}
-	return count;
 }
 
 /* This function is to open a directory	*/
-uint32_t openDirectory(Generation **gen, uint32_t fatherIndex) {
+uint32_t openRoot(Node **head, const char *filePath) {
 	uint32_t count = 0;
-	uint32_t i = 0;
-	// Khoi tao mot generation moi voi con tro gia tri = NULL
-	addGeneration(gen);
 	
-	// Add data
-	getData(*gen, data, fatherIndex);
+	// In root
+	uint32_t numberOfElements = readRootDirectory12(filePath);
+	if (numberOfElements == 0) {
+		printf("Empty Folder!\n");
+	}	
+	// Tra ve so phan tu trong thu muc root
+	return numberOfElements;
+}
+
+// Ham lay data cua node cuoi cung
+DataHalTypes getDataFromLastNode(Node *head){
+	DataHalTypes data;
+	if(head != NULL) {
+		// Tim den node cuoi cung
+		Node *temp = head;
+		while (temp != NULL) {
+			data = temp->data;
+			temp = temp->next;
+		}
+		return data;
+	}
+}
+
+/* This function is to open a directory	*/
+uint32_t openDirectory(Node **head, const char *filePath, uint8_t index) {
+	uint32_t count = 0;
+	uint32_t numberOfElements  = 0;
+	DataHalTypes data = getDataFromLastNode(*head);
 	
-	// Print data
-	uint32_t numberOfElements = printList(*gen);
+	// Lay data
+	// Neu link list chua co phan tu nao thi getdata tu root
+	if ((*head) == NULL) {
+		data = getRootData(filePath, index);
+		addNode(head, data);
+	}
+	// Neu link list co phan tu roi thi get data tu sub
+	else {
+		data = getSubData(filePath, &data, index);
+		addNode(head, data);
+	}
+	
+	// Neu nguoi dung chon mot thu muc thi mo thu muc sub
+	if (isFolder(data)) {
+		printf("This is a folder!\n");
+		// printNode(*head);
+		numberOfElements = readSubDirectory(filePath, &data);
+		if (numberOfElements == 0) {
+			printf("Empty Folder!\n");
+		}
+	}
+	// Neu nguoi dung chon mot file thi mo file
+	else {
+		printf("This is a file!\n");
+		numberOfElements = readFile(filePath, &data);
+		
+	}
 	
 	return numberOfElements;
 }
 
-// /* This function is to get data from readFat level	*/
-
-// Generation *getData() {
-	// Generation *genHead = NULL;
-    // Node *headRoot = NULL;
-	// addNodeRoot(&genHead, &headRoot, "app");
-	// addNodeRoot(&genHead, &headRoot, "doc");
-	// addNodeRoot(&genHead, &headRoot, "pic");
-	// addNodeRoot(&genHead, &headRoot, "sample.txt");
-	// addNodeRoot(&genHead, &headRoot, "sample1.txt");
-	// addNodeRoot(&genHead, &headRoot, "sample2.txt");
-	// addNodeRoot(&genHead, &headRoot, "sample3.txt");
+/* This function is to close a directory	*/
+uint32_t closeDirectory(Node **head, const char *filePath) {
+	uint32_t count = 0;
+	uint32_t numberOfElements  = 0;
 	
-	// Node *subDir1 = NULL;
-	// addNode(&genHead, &subDir1, "new", 1);
-	// addNode(&genHead, &subDir1, "concept.doc", 1);
-	// addNode(&genHead, &subDir1, "lkcd.pdf", 1);
-	// addNode(&genHead, &subDir1, "cpy.png", 2);
-	// addNode(&genHead, &subDir1, "elipse.png", 2);
+	// Xoa node cuoi cung
+	deleteNode(head);
+	if (numberOfNode(*head) == 0) {
+		// Dung ham readRoot de doc
+		numberOfElements = readRootDirectory12(filePath);
+	}
+	else {
+		// Lay data tu node cuoi cung cua list
+		DataHalTypes data = getDataFromLastNode(*head);
+		
+		// Hien thi noi dung thu muc, 
+		// Neu 
+		numberOfElements = readSubDirectory(filePath, &data);
+	}
 	
-	// Node *subDir2 = NULL;
-	// addNode(&genHead, &subDir2, "newagin", 0);
-	// addNode(&genHead, &subDir2, "newagin2", 1);
-	
-	// Node *subDir3 = NULL;
-	// addNode(&genHead, &subDir3, "n1", 0);
-	
-	
-	// return genHead;
-// }
+	// Tra ve so phan tu cua thu muc
+	return numberOfElements;
+}
 
 /* 
  * This function is to check the number inputed by user	
