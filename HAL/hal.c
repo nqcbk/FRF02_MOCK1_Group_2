@@ -1,183 +1,114 @@
 #include "hal.h"
 
+/** Function Pointers */
+static uint32_t (*readRootDirectory[])(const char *filePath) = {
+	&readRootDirectory12,
+	&readRootDirectory16,
+	&readRootDirectory32
+};
 
+static DataTypes (*getRootData[])(const char *filePath, uint32_t index) = {
+	&getRootData12,
+	&getRootData16,
+	&getRootData32
+};
 
-/* This function is to add a node in sub directory */
-static void addNode(Node **head, DataHalTypes data){
-    Node *newNode = (Node *)malloc(sizeof(Node));
-	
-	// Assign Data for Node
-	newNode->data = data;
-	newNode->next = NULL;
-	if ((*head) == NULL) {
-		(*head) = newNode;
+static uint32_t (*readSubDirectory[])(const char *filePath, DataTypes *data) = {
+	&readSubDirectory12,
+	&readSubDirectory16,
+	&readSubDirectory32
+};
+
+static DataTypes (*getSubData[])(const char *filePath, DataTypes *data, uint32_t index) = {
+	&getSubData12,
+	&getSubData16,
+	&getSubData32
+};
+
+static uint32_t (*readFile[])(const char *filePath, DataTypes *data) = {
+	&readFile12,
+	&readFile16,
+	&readFile32
+};
+
+static FatTypes g_type;
+
+/* This function is to open root */
+uint32_t openRoot(const char *filePath){
+	uint32_t numberOfElements = 0;
+	/* Check type of FAT file system here */
+	g_type = checkFatTypes(filePath);
+	if (g_type == ERROR) {
+		printf("NOT A FAT TYPE!");
+		numberOfElements = 0;
 	}
-    else{
-		// Find the node at end of linked list
-		Node *temp = *head;
-		while( temp->next != NULL )
-		{
-			temp = temp->next;
-		}
-		newNode->next = NULL;  
-		temp->next = newNode;
-    }   
-}
-
-
-// Lay so phan tu cua list
-uint32_t numberOfNode(Node *head) {
-	uint32_t result = 0;
-	if (head != NULL) {
-		// Tim den phan tu cuoi cung
-		Node *lastNode = head;
-		while (lastNode != NULL) {
-			result++;
-			lastNode = lastNode->next;
-		}
+	else {
+		/* Print all elements in root directory */
+		numberOfElements = (*readRootDirectory[g_type])(filePath);
 	}
-	return result;
-}
-
-/* This function is to xoa phan tu cuoi cung */
-static void deleteNode(Node **head){
-	if((*head) != NULL) {
-		// Neu chi co 1 node thi xoa node do
-		if ((*head)->next == NULL)
-        {
-            *head = NULL;
-        }
-		// Neu co nhieu node thi xoa node cuoi cung
-        else
-        {
-            Node *temp = (*head);
-            while((temp->next)->next != NULL )
-            {
-				temp = temp->next;
-            }
-			temp->next = NULL;
-        }
-	}
-}
-
-/* This function is to open a file	*/
-
-
-
-// Ham in toan bo thu muc va file cua generation cuoi cung, tra ve so luong phan tu
-void printNode(Node *head){
-	if(head != NULL) {
-		// Tim den node cuoi cung
-		Node *temp = head;
-		while (temp->next != NULL) {
-			temp = temp->next;
-		}
-		printf("fileAttributes: %x\n", temp->data.fileAttributes);
-		printf("startingClusterNumber: %x\n", temp->data.startingClusterNumber);
-		printf("fileSize: %x\n", temp->data.fileSize);
-		printf("\n");
-	}
-}
-
-/* This function is to open a directory	*/
-uint32_t openRoot(Node **head, const char *filePath) {
-	uint32_t count = 0;
-	
-	// In root
-	uint32_t numberOfElements = readRootDirectory12(filePath);
-	if (numberOfElements == 0) {
-		printf("Empty Folder!\n");
-	}	
-	// Tra ve so phan tu trong thu muc root
+	/* Return number of elements in root directory */
 	return numberOfElements;
 }
 
-// Ham lay data cua node cuoi cung
-DataHalTypes getDataFromLastNode(Node *head){
-	DataHalTypes data;
-	if(head != NULL) {
-		// Tim den node cuoi cung
-		Node *temp = head;
-		while (temp != NULL) {
-			data = temp->data;
-			temp = temp->next;
-		}
-		return data;
-	}
-}
-
 /* This function is to open a directory	*/
-uint32_t openDirectory(Node **head, const char *filePath, uint8_t index) {
+uint32_t openDirectory(const char *filePath, uint8_t index) {
 	uint32_t count = 0;
 	uint32_t numberOfElements  = 0;
-	DataHalTypes data = getDataFromLastNode(*head);
-	
-	// Lay data
-	// Neu link list chua co phan tu nao thi getdata tu root
-	if ((*head) == NULL) {
-		data = getRootData(filePath, index);
-		addNode(head, data);
+	/* Get data from last element in linked list */
+	DataTypes data = getDataFromLastNode();
+	/* If there is no element in linked list, get data from root directory and create an element in linked list */
+	if (numberOfNode() == 0) {
+		data = (*getRootData[g_type])(filePath, index);
+		addNode(data);
 	}
-	// Neu link list co phan tu roi thi get data tu sub
+	/* Get data from sub directory and also create an element to linked list */
 	else {
-		data = getSubData(filePath, &data, index);
-		addNode(head, data);
+		data = (*getSubData[g_type])(filePath, &data, index);
+		addNode(data);
 	}
-	
-	// Neu nguoi dung chon mot thu muc thi mo thu muc sub
+	/* If users select a folder, open sub directory */
 	if (isFolder(data)) {
-		printf("This is a folder!\n");
-		// printNode(*head);
-		numberOfElements = readSubDirectory(filePath, &data);
-		if (numberOfElements == 0) {
-			printf("Empty Folder!\n");
-		}
+		numberOfElements = (*readSubDirectory[g_type])(filePath, &data);
 	}
-	// Neu nguoi dung chon mot file thi mo file
+	/* If users select a file, open that one */
 	else {
-		printf("This is a file!\n");
-		numberOfElements = readFile(filePath, &data);
-		
+		numberOfElements = (*readFile[g_type])(filePath, &data);
 	}
-	
+	/* Return number of elements in sub directory */
 	return numberOfElements;
 }
 
-/* This function is to close a directory	*/
-uint32_t closeDirectory(Node **head, const char *filePath) {
+/* This function is to close a directory */
+uint32_t closeDirectory(const char *filePath) {
 	uint32_t count = 0;
 	uint32_t numberOfElements  = 0;
-	
-	// Xoa node cuoi cung
-	deleteNode(head);
-	if (numberOfNode(*head) == 0) {
-		// Dung ham readRoot de doc
-		numberOfElements = readRootDirectory12(filePath);
+	/* Delete the last element in linked list */
+	deleteLastNode();
+	/* If there is no element left in linked list, read root directory */
+	if (numberOfNode() == 0) {
+		numberOfElements = (*readRootDirectory[g_type])(filePath);
 	}
 	else {
-		// Lay data tu node cuoi cung cua list
-		DataHalTypes data = getDataFromLastNode(*head);
-		
-		// Hien thi noi dung thu muc, 
-		// Neu 
-		numberOfElements = readSubDirectory(filePath, &data);
+		/* Get data from last element in linked list */
+		DataTypes data = getDataFromLastNode();
+		/* Show sub directory */
+		numberOfElements = (*readSubDirectory[g_type])(filePath, &data);
 	}
-	
-	// Tra ve so phan tu cua thu muc
+	/* Return number of elements in sub directory or root directory */
 	return numberOfElements;
 }
 
-/* 
- * This function is to check the number inputed by user	
- * The number is a positive integer from 0 to maxNumber
- */
+/* This function is to check the number inputed by user	
+ * The number is a positive integer from 0 to maxNumber */
 uint32_t inputNumberByUser(uint32_t maxNumber) {
 	uint32_t number = 0;
 	do{
-		printf("\nInput a number to open: ");
-		fflush(stdin);
+		printf("\nInput a number: ");
+		
 		scanf("%d", &number);
+		fflush(stdin);
 	}while((number < 0) || (number > maxNumber));
 	return number;
 }
+
 

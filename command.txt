@@ -1,3 +1,1 @@
-gcc -o main APP/main.c HAL/hal.c READFAT/readFat.c -I"./HAL" -I"./READFAT"
-gcc -E APP/main.c HAL/hal.c READFAT/readFat.c -o APP/main.i HAL/hal.i READFAT/readFat.i -I"./HAL" -I"./READFAT"
-gcc -E APP/main.c -o APP/main.i -I"./HAL" -I"./READFAT"
+gcc -o main APP/main.c HAL/hal.c LIST/list.c READFAT/readFat.c -I"./HAL" -I"./LIST" -I"./READFAT"
