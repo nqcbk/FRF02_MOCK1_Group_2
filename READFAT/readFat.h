@@ -142,9 +142,11 @@ typedef struct FAT32_BOOT{
 /** Define FAT sector*/
 /* FAT12 */
 #define FAT12_ENTRY_EOC							    0xFFF	/* Entry end of chain for directory or file in FAT12 */
+#define FAT12_ENTRY_BAD_CLUSTER						0xFF7
 
 /* FAT16 */
 #define FAT16_ENTRY_EOC							    0xFFFF	/* Entry end of chain for directory or file in FAT16 */
+#define FAT16_ENTRY_BAD_CLUSTER						0xFFF7
 
 /** Define Root Directory */
 #define RD_NUMBER_OF_BYTES_PER_DOUBLE_LINES			32
@@ -170,6 +172,7 @@ typedef struct ENTRY_FORMAT {
 } EntryFormat;
 
 /* Define File Atributes */
+#define ATT_NORMAL_FILE								0x00
 #define ATT_READ_ONLY                               0x01
 #define ATT_HIDDEN_FILE                             0x02
 #define ATT_SYSTEM_FILE                             0x04
@@ -344,6 +347,7 @@ uint32_t getEntryFat12(uint8_t *byte, uint32_t position);
 /* This function is to clear space in a string */
 static void removeSpace(uint8_t *str);
 
+static Bool isFileOrFolder(EntryFormat entry);
 
 #endif /*_READFAT_H_*/
 

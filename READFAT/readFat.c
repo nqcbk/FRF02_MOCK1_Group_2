@@ -17,7 +17,7 @@ FatTypes checkFatTypes(const char *filePath){
         uint8_t fatName[BS_NAME_OF_FAT] = {0};
 		int i = 0;
         /* the FILE pointer offset 0x36 from the beginning of file */
-        fseek( f, 0x36 , 1); 
+        fseek( f, FAT_TYPE_POSITION , 1); 
         for (i = 0; i < BS_NAME_OF_FAT; i++)
         {
             fatName[i] = fgetc(f);
@@ -43,7 +43,7 @@ FatTypes checkFatTypes(const char *filePath){
 		else
 		{
             rewind(f);
-            fseek( f, 0x52 , SEEK_SET);
+            fseek( f, FAT32_FAT_TYPE_POSITION , SEEK_SET);
             
             for (int i = 0; i < BS_NAME_OF_FAT; i++){
                 fatName[i] = fgetc(f);
@@ -136,7 +136,7 @@ uint32_t readRootDirectory12(const char *filePath){
 			/* Read each entry (32 bytes)*/ 
             fread(&root, sizeof(EntryFormat), 1, f);
 			/* If it is file or folder, print */ 
-            if ((ATT_LONG_FILE_NAME != (root.fileAttributes[0])) && checkFileName(root)){
+            if (isFileOrFolder(root)){
 				number++;
             	/* Get name of file and root directory */
                 printf("\t%d. ", number);
@@ -225,40 +225,75 @@ uint32_t readRootDirectory16(const char *filePath)
 		/* Move pointer of file to first byte in root location */
         fseek(f, firstRootLocation, 1);
 		/* Check elements of root, if it's file or folder, print */
+		printf("\n\n");
+		printf("\t|Name|\t\t|Type|\t\t|Size|\t\t|Date|\t\t|Time|\n");
+		printf("\n");
 		EntryFormat root;
         for (int i = 0; i < numberOfRootDirEntry; i++)
         {
 			/* Read each entry (32 bytes)*/ 
             fread(&root, sizeof(EntryFormat), 1, f);
 			/* If it is file or folder, print */ 
-            if ((ATT_LONG_FILE_NAME != (root.fileAttributes[0])) && checkFileName(root))
-            {
+            if ((ATT_LONG_FILE_NAME != (root.fileAttributes[0])) && checkFileName(root)){
 				number++;
             	/* Get name of file and root directory */
-                printf("%d. ", number);
+                printf("\t%d. ", number);
 				int j = 0;
                 for (j = 0; j < RD_FILE_NAME; j++)
                 {
-					if (root.fileName[j] != ' ')
-					{
-						printf("%c", root.fileName[j]);
-					}
+					printf("%c", root.fileName[j]);
                 }
+                printf("\t");
 
-				/* If it is a file, print extension */ 
-				if (root.fileAttributes[0] != ATT_DIRECTORY)
+                /* If it is a file, print extension */ 
+                if (root.fileAttributes[0] != ATT_DIRECTORY)
 				{
 					printf("File ");
 					for (j = 0; j < RD_FILENAME_EXTENSION; j++)
 					{
 						printf("%c", root.fileNameExtension[j]);
 					}
+					printf("\t");
 				}
 
+				/* If it's a folder, print file folder */
 				if (root.fileAttributes[0] == ATT_DIRECTORY)
 				{
 					printf("File Folder");
+					printf("\t");
+				} 
+				
+				/* Get size of file */
+				if (root.fileAttributes[0] != ATT_DIRECTORY)
+				{
+					
+					printf("%d bytes", reverseByte(root.fileSize, RD_FILE_SIZE));
+					printf("\t");
 				}
+				if (root.fileAttributes[0] == ATT_DIRECTORY)
+				{
+					
+					printf("\t\t");
+				}
+
+				/* Get date of file */
+        		uint32_t DateAfterReverse = reverseByte(root.fileDate, RD_FILE_DATE);
+        		uint16_t year = CALC_YEAR(DateAfterReverse);
+        		uint16_t month = CALC_MONTH(DateAfterReverse);
+        		uint16_t day = CALC_DAY(DateAfterReverse);
+ 
+                // printf("%04d/%02d/%02d\t", year + BIN_YEAR_OFFSET_FROM, month, day);
+                printf("%02d/%02d/%04d\t", day, month, year + BIN_YEAR_OFFSET_FROM);
+
+                /* Get time of file */
+				uint32_t TimeAfterReverse = reverseByte(root.fileTime, RD_FILE_TIME);
+				uint16_t hours = CALC_HOURS(TimeAfterReverse);
+				uint16_t minutes = CALC_MINUTES(TimeAfterReverse);
+				uint16_t seconds = CALC_SECONDS(TimeAfterReverse);
+
+				// printf("%02d:%02d:%02d", hours, minutes, seconds);
+				printf("%02d:%02d:%02d", hours, minutes, seconds);
+               
 				printf(" \n");
             }	
         }
@@ -299,7 +334,7 @@ DataTypes getRootData12(const char *filePath, uint32_t index){
 			/* Read each entry(32 bytes) */ 
             fread(&root, sizeof(EntryFormat), 1, f);
 			/* Save file or folder which users select to data struct */ 
-            if ((ATT_LONG_FILE_NAME != (root.fileAttributes[0])) && checkFileName(root)){
+            if (isFileOrFolder(root)){
 				number++;
             	data.fileAttributes = reverseByte(root.fileAttributes, RD_FILE_ATTRIBUTES);
 				data.startClusNum = reverseByte(root.startClusNum, RD_STARTING_CLUSTER_NUMBER);
@@ -381,6 +416,10 @@ uint32_t readSubDirectory12(const char *filePath, DataTypes *data) {
 		/* entryOfCLuster is assigned to avoid to change the value of data->startClusNum after loop */
 		uint32_t entryOfCLuster = data->startClusNum;
 		EntryFormat dir;
+		printf("\n\n");
+		printf("\t|Name|\t\t|Type|\t\t|Size|\t\t|Date|\t\t|Time|\n");
+		printf("\n");
+		uint32_t nextClusterPosition = 0;
 		do {
 			/* Calculate the first sector's position of cluster */
 			uint32_t firstSectorPosition = firstDataLocation + entryOfCLuster;
@@ -390,14 +429,11 @@ uint32_t readSubDirectory12(const char *filePath, DataTypes *data) {
 			fseek(f, firstClusterPosition, 1);
 			uint32_t i = 0;
 			/* Read a cluster */
-			printf("\n\n");
-			printf("\t|Name|\t\t|Type|\t\t|Size|\t\t|Date|\t\t|Time|\n");
-			printf("\n");
 			for (int i = 0; i < (16 * sectorPerCluster); i++){
 				/* Read each entry (32 bytes) */ 
 				fread(&dir, sizeof(EntryFormat), 1, f);
 				/* If it's a file or folder, print */ 
-				if ((ATT_LONG_FILE_NAME != (dir.fileAttributes[0])) && checkFileName(dir)){
+				if (isFileOrFolder(dir)){
 					number++;
 					/* Get name of file and root directory */
 					printf("\t%d. ", number);
@@ -456,39 +492,42 @@ uint32_t readSubDirectory12(const char *filePath, DataTypes *data) {
 			/* In FAT12 Type, every 3 bytes represent 2 entries */
 			/* Calculate the offset of next cluster's entry in FAT Area */
 			uint32_t nextClusterOffset = (uint32_t)(1.5 * entryOfCLuster);
-			uint32_t nextClusterPosition = 0;
 			uint8_t doubleEntry[3] = {0};
 			uint32_t nextClusterEntry = 0;
 			/* In case nextClusterOffset is not divisible by 3, nextClusterEntry is at the middle byte's position, 
 			 * and we will get the second entry */
 			if ((nextClusterOffset % 3) != 0) {
 				/* Calculate the first position of 3 bytes */
-				nextClusterPosition = nextClusterOffset - 1 + sectorPerCluster * bytePerSector;
-				/* Move the file's poiter to the position */
-				rewind(f);
-				fseek(f, nextClusterPosition, 1);
-				/* Read 3 bytes */
-				fread(doubleEntry, sizeof(doubleEntry), 1, f);
-				/* Get the second entry */
-				nextClusterEntry = getEntryFat12(doubleEntry, 2);
+				nextClusterPosition = nextClusterOffset - 1 + bytePerSector;
+				if (nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector)) {
+					/* Move the file's poiter to the position */
+					rewind(f);
+					fseek(f, nextClusterPosition, 1);
+					/* Read 3 bytes */
+					fread(doubleEntry, sizeof(doubleEntry), 1, f);
+					/* Get the second entry */
+					nextClusterEntry = getEntryFat12(doubleEntry, 2);
+				}	
 			}
 			/* In case nextClusterOffset is divisible by 3, nextClusterEntry is at the first byte's position, 
 			 * and we will get the first entry */
 			else {
 				/* Calculate the first position of 3 bytes */
-				nextClusterPosition = nextClusterOffset + bytePerSector * sectorPerCluster;
-				/* Move the file's poiter to the position */
-				rewind(f);
-				fseek(f, nextClusterPosition, 1);
-				/* Read 3 bytes */
-				fread(doubleEntry, sizeof(doubleEntry), 1, f);
-				/* Get the second entry */
-				nextClusterEntry = getEntryFat12(doubleEntry, 1);
+				nextClusterPosition = nextClusterOffset + bytePerSector;
+				if (nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector)) {
+					/* Move the file's poiter to the position */
+					rewind(f);
+					fseek(f, nextClusterPosition, 1);
+					/* Read 3 bytes */
+					fread(doubleEntry, sizeof(doubleEntry), 1, f);
+					/* Get the second entry */
+					nextClusterEntry = getEntryFat12(doubleEntry, 1);
+				}
 			}
 			/* Assign data to entryOfCLuster */
 			entryOfCLuster = nextClusterEntry;
 		}
-		while (entryOfCLuster != FAT12_ENTRY_EOC);
+		while ((entryOfCLuster != FAT12_ENTRY_EOC) && nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector));
         fclose(f);
     }
 	return number;
@@ -518,6 +557,10 @@ uint32_t readSubDirectory16(const char *filePath, DataTypes *data) {
 		/* entryOfCLuster is assigned to avoid to change the value of data->startClusNum after loop */
 		uint32_t entryOfCLuster = data->startClusNum;
 		EntryFormat dir;
+		uint32_t nextClusterPosition = 0;
+		printf("\n\n");
+		printf("\t|Name|\t\t|Type|\t\t|Size|\t\t|Date|\t\t|Time|\n");
+		printf("\n");
 		do {
 			/* Calculate the first sector's position of cluster */
 			uint32_t firstFolderPosition = firstDataLocation + entryOfCLuster;
@@ -525,50 +568,86 @@ uint32_t readSubDirectory16(const char *filePath, DataTypes *data) {
 			uint32_t firstClusterPosition = firstFolderPosition * bytePerSector;
 			/* Move the file's poiter to cluster's position */
 			fseek(f, firstClusterPosition, 1);
-			/* Print all sectors in cluster */
-			uint8_t text[bytePerSector * sectorPerCluster];
+			
 			uint32_t i = 0;
 			/* Check elements of root, if it's folder location of user's input, return it's data */
 			for (int i = 0; i < (16 * sectorPerCluster); i++){
-				/* Read each entry(32 bytes) */ 
+				/* Read each entry (32 bytes) */ 
 				fread(&dir, sizeof(EntryFormat), 1, f);
 				/* If it's a file or folder, print */ 
-				if ((ATT_LONG_FILE_NAME != (dir.fileAttributes[0])) && checkFileName(dir)){
+				if (isFileOrFolder(dir)){
 					number++;
 					/* Get name of file and root directory */
-					printf("%d. ", number);
+					printf("\t%d. ", number);
 					int j = 0;
-					for (j = 0; j < RD_FILE_NAME; j++){
-						if (dir.fileName[j] != ' '){
-							printf("%c", dir.fileName[j]);
-						}
+					for (j = 0; j < RD_FILE_NAME; j++)
+					{
+						printf("%c", dir.fileName[j]);	
 					}
+					printf("\t");
 					/* If it's a file, print the extension */
-					if (dir.fileAttributes[0] != ATT_DIRECTORY){
-						printf(".");
-						for (j = 0; j < RD_FILENAME_EXTENSION; j++){
+					if (dir.fileAttributes[0] != ATT_DIRECTORY)
+					{
+						printf("File ");
+						for (j = 0; j < RD_FILENAME_EXTENSION; j++)
+						{
 							printf("%c", dir.fileNameExtension[j]);
 						}
+						printf("\t");
 					}
+					if (dir.fileAttributes[0] == ATT_DIRECTORY)
+					{
+						printf("File Folder");
+						printf("\t");
+						}
+					/* Get size of file */
+					if (dir.fileAttributes[0] != ATT_DIRECTORY)
+					{
+						
+						printf("%d bytes", reverseByte(dir.fileSize, RD_FILE_SIZE));
+						printf("\t");
+					}
+					if (dir.fileAttributes[0] == ATT_DIRECTORY)
+					{
+						
+						printf("\t\t");
+				}
+					/* Get date of file */
+	        		uint32_t DateAfterReverse = reverseByte(dir.fileDate, RD_FILE_DATE);
+	        		uint16_t year = CALC_YEAR(DateAfterReverse);
+	        		uint16_t month = CALC_MONTH(DateAfterReverse);
+	        		uint16_t day = CALC_DAY(DateAfterReverse);
+	 
+	                printf("%02d/%02d/%04d\t", day, month, year + BIN_YEAR_OFFSET_FROM);
+	                
+	                /* Get time of file */
+					uint32_t TimeAfterReverse = reverseByte(dir.fileTime, RD_FILE_TIME);
+					uint16_t hours = CALC_HOURS(TimeAfterReverse);
+					uint16_t minutes = CALC_MINUTES(TimeAfterReverse);
+					uint16_t seconds = CALC_SECONDS(TimeAfterReverse);
+
+					printf("%02d:%02d:%02d", hours, minutes, seconds);
 					printf(" \n");
 				}	
 			}
 			/* Determine the next cluster */
 			/* In FAT16 Type, every 2 bytes represent 1 entries */
 			/* Calculate the offset of next cluster's entry in FAT Area */
-			uint32_t nextClusterPosition = 2 * entryOfCLuster + sectorPerCluster * bytePerSector;
-			/* Move the file's poiter to the position */
-			rewind(f);
-			fseek(f, nextClusterPosition, 1);
-			/* Read 2 bytes */
-			uint8_t entry[2];
-			fread(entry, sizeof(entry), 1, f);
-			/* Reverse data */
-			uint32_t nextClusterEntry = reverseByte(entry, 2);
-			/* Assign data to entryOfCLuster */
-			entryOfCLuster = nextClusterEntry;
+			nextClusterPosition = 2 * entryOfCLuster + bytePerSector;
+			if (nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector)){
+				/* Move the file's poiter to the position */
+				rewind(f);
+				fseek(f, nextClusterPosition, 1);
+				/* Read 2 bytes */
+				uint8_t entry[2];
+				fread(entry, sizeof(entry), 1, f);
+				/* Reverse data */
+				uint32_t nextClusterEntry = reverseByte(entry, 2);
+				/* Assign data to entryOfCLuster */
+				entryOfCLuster = nextClusterEntry;
+			}
 		}
-		while (entryOfCLuster != FAT16_ENTRY_EOC);
+		while ((entryOfCLuster != FAT16_ENTRY_EOC) && nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector));
         fclose(f);
     }
 	return number;
@@ -618,7 +697,7 @@ DataTypes getSubData12(const char *filePath, DataTypes *data, uint32_t index) {
 				/* Read each entry(32 bytes) */ 
 				fread(&dir, sizeof(EntryFormat), 1, f);
 				/* If it's a file or folder, print */ 
-				if ((ATT_LONG_FILE_NAME != (dir.fileAttributes[0])) && checkFileName(dir)){
+				if (isFileOrFolder(dir)){
 					number++;
 					if (number == index){
 						newData.fileAttributes = reverseByte(dir.fileAttributes, RD_FILE_ATTRIBUTES);
@@ -639,7 +718,7 @@ DataTypes getSubData12(const char *filePath, DataTypes *data, uint32_t index) {
 			 * and we will get the second entry */
 			if ((nextClusterOffset % 3) != 0) {
 				/* Calculate the first position of 3 bytes */
-				nextClusterPosition = nextClusterOffset - 1 + bytePerSector * sectorPerCluster;
+				nextClusterPosition = nextClusterOffset - 1 + bytePerSector;
 				/* Move the file's poiter to the position */
 				rewind(f);
 				fseek(f, nextClusterPosition, 1);
@@ -709,7 +788,7 @@ DataTypes getSubData16(const char *filePath, DataTypes *data, uint32_t index) {
 				/* Read each entry(32 bytes) */ 
 				fread(&dir, sizeof(EntryFormat), 1, f);
 				/* If it's a file or folder, print */ 
-				if ((ATT_LONG_FILE_NAME != (dir.fileAttributes[0])) && checkFileName(dir)){
+				if (isFileOrFolder(dir)){
 					number++;
 					if (number == index){
 						newData.fileAttributes = reverseByte(dir.fileAttributes, RD_FILE_ATTRIBUTES);
@@ -722,7 +801,7 @@ DataTypes getSubData16(const char *filePath, DataTypes *data, uint32_t index) {
 			/* Determine the next cluster */
 			/* In FAT16 Type, every 2 bytes represent 1 entries */
 			/* Calculate the offset of next cluster's entry in FAT Area */
-			uint32_t nextClusterPosition = 2 * entryOfCLuster + bytePerSector * sectorPerCluster;
+			uint32_t nextClusterPosition = 2 * entryOfCLuster + bytePerSector;
 			/* Move the file's poiter to the position */
 			rewind(f);
 			fseek(f, nextClusterPosition, 1);
@@ -769,6 +848,7 @@ uint32_t readFile12(const char *filePath, DataTypes *data) {
 		/* entryOfCLuster is assigned to avoid to change the value of data->startClusNum after loop */
 		uint32_t entryOfCLuster = data->startClusNum;
 		uint32_t count = 0;
+		uint32_t nextClusterPosition = 0;
 		do {
 			/* Calculate the first sector's position of cluster */
 			uint32_t firstSectorPosition = firstDataLocation + entryOfCLuster;
@@ -787,39 +867,43 @@ uint32_t readFile12(const char *filePath, DataTypes *data) {
 			/* In FAT12 Type, every 3 bytes represent 2 entries */
 			/* Calculate the offset of next cluster's entry in FAT Area */
 			uint32_t nextClusterOffset = (uint32_t)(1.5 * entryOfCLuster);
-			uint32_t nextClusterPosition = 0;
 			uint8_t doubleEntry[3] = {0};
 			uint32_t nextClusterEntry = 0;
 			/* In case nextClusterOffset is not divisible by 3, nextClusterEntry is at the middle byte's position, 
 			 * and we will get the second entry */
 			if ((nextClusterOffset % 3) != 0) {
 				/* Calculate the first position of 3 bytes */
-				nextClusterPosition = nextClusterOffset - 1 + bytePerSector * sectorPerCluster;
-				/* Move the file's poiter to the position */
-				rewind(f);
-				fseek(f, nextClusterPosition, 1);
-				/* Read 3 bytes */
-				fread(doubleEntry, sizeof(doubleEntry), 1, f);
-				/* Get the second entry */
-				nextClusterEntry = getEntryFat12(doubleEntry, 2);
+				nextClusterPosition = nextClusterOffset - 1 + bytePerSector;
+				if (nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector)) {
+					/* Move the file's poiter to the position */
+					rewind(f);
+					fseek(f, nextClusterPosition, 1);
+					/* Read 3 bytes */
+					fread(doubleEntry, sizeof(doubleEntry), 1, f);
+					/* Get the second entry */
+					nextClusterEntry = getEntryFat12(doubleEntry, 2);
+				}
 			}
 			/* In case nextClusterOffset is divisible by 3, nextClusterEntry is at the first byte's position, 
 			 * and we will get the first entry */
 			else {
 				/* Calculate the first position of 3 bytes */
-				nextClusterPosition = nextClusterOffset + bytePerSector * sectorPerCluster;
-				/* Move the file's poiter to the position */
-				rewind(f);
-				fseek(f, nextClusterPosition, 1);
-				/* Read 3 bytes */
-				fread(doubleEntry, sizeof(doubleEntry), 1, f);
-				/* Get the second entry */
-				nextClusterEntry = getEntryFat12(doubleEntry, 1);
+				nextClusterPosition = nextClusterOffset + bytePerSector;
+				if (nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector)) {
+					/* Move the file's poiter to the position */
+					rewind(f);
+					fseek(f, nextClusterPosition, 1);
+					/* Read 3 bytes */
+					fread(doubleEntry, sizeof(doubleEntry), 1, f);
+					/* Get the second entry */
+					nextClusterEntry = getEntryFat12(doubleEntry, 1);
+				}
+				
 			}
 			/* Assign data to entryOfCLuster */
 			entryOfCLuster = nextClusterEntry;
 		}
-		while (entryOfCLuster != FAT12_ENTRY_EOC);
+		while ((entryOfCLuster != FAT12_ENTRY_EOC) && nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector));
         fclose(f);
     }
 	return 0;
@@ -848,6 +932,7 @@ uint32_t readFile16(const char *filePath, DataTypes *data) {
 		uint32_t firstDataLocation = NUMBER_OF_BOOT_SECTORS + numberOfFatSectors + numberOfRootSectors - 2;
 		/* entryOfCLuster is assigned to avoid to change the value of data->startClusNum after loop */
 		uint32_t entryOfCLuster = data->startClusNum;
+		uint32_t nextClusterPosition = 0;
 		do {
 			/* Calculate the first sector's position of cluster */
 			uint32_t firstSectorPosition = firstDataLocation + entryOfCLuster;
@@ -865,19 +950,21 @@ uint32_t readFile16(const char *filePath, DataTypes *data) {
 			/* Determine the next cluster */
 			/* In FAT16 Type, every 2 bytes represent 1 entries */
 			/* Calculate the offset of next cluster's entry in FAT Area */
-			uint32_t nextClusterPosition = (2 * entryOfCLuster) + bytePerSector * sectorPerCluster;
-			/* Move the file's poiter to the position */
-			rewind(f);
-			fseek(f, nextClusterPosition, 1);
-			/* Read 2 bytes */
-			uint8_t entry[2];
-			fread(entry, sizeof(entry), 1, f);
-			/* Reverse data */
-			uint32_t nextClusterEntry = reverseByte(entry, 2);
-			/* Assign data to entryOfCLuster */
-			entryOfCLuster = nextClusterEntry;
+			nextClusterPosition = (2 * entryOfCLuster) + bytePerSector;
+			if (nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector)) {
+				/* Move the file's poiter to the position */
+				rewind(f);
+				fseek(f, nextClusterPosition, 1);
+				/* Read 2 bytes */
+				uint8_t entry[2];
+				fread(entry, sizeof(entry), 1, f);
+				/* Reverse data */
+				uint32_t nextClusterEntry = reverseByte(entry, 2);
+				/* Assign data to entryOfCLuster */
+				entryOfCLuster = nextClusterEntry;
+			}
 		}
-		while (entryOfCLuster != FAT16_ENTRY_EOC);
+		while ((entryOfCLuster != FAT16_ENTRY_EOC) && nextClusterPosition < ((numberOfFatSectors + 1) * bytePerSector));
         fclose(f);
     }
 	return 0;
@@ -915,6 +1002,36 @@ static Bool checkFileName(EntryFormat root)
 	return result;
 }
 
+static Bool isFileOrFolder(EntryFormat entry){
+	Bool result = TRUE;
+	if (checkFileName(entry)){
+		switch(entry.fileAttributes[0]){
+			case ATT_NORMAL_FILE:
+				result = TRUE;
+				break;
+			case ATT_READ_ONLY:
+				result = TRUE;
+				break;
+			case ATT_HIDDEN_FILE:
+				result = TRUE;
+				break;
+			case ATT_SYSTEM_FILE:
+				result = TRUE;
+				break;
+			case ATT_DIRECTORY:
+				result = TRUE;
+				break;
+			default:
+				result = FALSE;
+				break;
+		}
+	}
+	else {
+		result = FALSE;
+	}
+	return result;
+}
+
 /* This function is to reverse bytes */
 uint32_t reverseByte(uint8_t *byte, uint32_t count){
     uint32_t result = 0;
@@ -943,8 +1060,7 @@ uint32_t getEntryFat12(uint8_t *byte, uint32_t position) {
 }
 
 /* This function is to clear space in a string */
-static void removeSpace(uint8_t *str) 
-{
+static void removeSpace(uint8_t *str) {
 	uint32_t pos = 0, i = 0;
 	uint32_t len = strlen(str);
 	for(i = 0; i < len; i++)
