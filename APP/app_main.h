@@ -1,4 +1,4 @@
-/*** HARDWARE ABSTRACTION LAYER ***/
+/*** MAIN ***/
 #ifndef _MAIN_H_
 #define _MAIN_H_
 

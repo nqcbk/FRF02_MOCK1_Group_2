@@ -1,4 +1,4 @@
-/*** HARDWARE ABSTRACTION LAYER ***/
+/*** APP DISPLAY ***/
 #ifndef _APP_DISPLAY_H_
 #define _APP_DISPLAY_H_
 
